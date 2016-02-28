@@ -8,16 +8,13 @@ import sys
 import os
 import datetime
 import logging
-from raven.handlers.logging import SentryHandler
-# from raven.conf import setup_logging
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 
+from . import MyLocal
 from character import _cs, _cu
 
-LOGDEBUG = True
-LOGDIR = '/var/log/'
-FILEDIR = '/var/file/'
-TIMEOUT = 10
+CFG = MyLocal(debug=True, dir='~/log/', handlers=[])
+
 
 def _print(*args):
     """
@@ -27,7 +24,7 @@ def _print(*args):
           list, list of printing contents
         
     """
-    if not LOGDEBUG:
+    if not CFG.debug:
         return
     if not args:
         return
@@ -51,6 +48,7 @@ def _print(*args):
                 args[i] = v.encode('gbk')
     print '[%s]'%str(datetime.datetime.now()), prefix, ' '.join(args)
 
+
 def _print_err(*args):
     """
         Print errors.
@@ -59,7 +57,7 @@ def _print_err(*args):
           list, list of printing contents
         
     """
-    if not LOGDEBUG:
+    if not CFG.debug:
         return
     if not args:
         return
@@ -77,7 +75,7 @@ def _print_err(*args):
     print bcolors.FAIL+'[%s]'%str(datetime.datetime.now()), prefix, ' '.join(args) + bcolors.ENDC
 
 
-def logprint(logname, category, level='INFO', to_stdout=True, backupCount=15, sentrykey=''):
+def logprint(logname, category, level='INFO', backupCount=15):
     """
         Print logs by datetime.
 
@@ -87,89 +85,74 @@ def logprint(logname, category, level='INFO', to_stdout=True, backupCount=15, se
           string, category path of logs file in log directory
         level
           string, restrict whether logs to be printed or not
-        to_stdout
-          bool, restrict whether logs to be print in the console or not
         backupCount
           int, how many backups can be reserved
-        sentrykey
-          string, a key for raven to sentry
         
     """
-    path = os.path.join(LOGDIR, category, logname + '.log')
+    path = os.path.join(CFG.dir, category.strip('/'), logname.strip('/') + '.log')
     print "log path:", path
     if not os.path.exists(path[:path.rindex('/')]):
         os.makedirs(path[:path.rindex('/')])
     # Initialize logger
     logger = logging.getLogger(logname)
     frt = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    hdr = None
-    if path:
-        hdr = TimedRotatingFileHandler(path, 'D', 1, backupCount)
-        hdr.suffix = "%Y%m%d"
-        # hdr = RotatingFileHandler(path, 'a', maxBytes, backupCount, 'utf-8')
+
+    hdr = logging.StreamHandler(sys.stdout)
+    hdr.setFormatter(frt)
+    hdr._name = '##_sh_##'
+    already_in = False
+    for _hdr in logger.handlers:
+        if _hdr._name == '##_sh_##':
+            already_in = True
+            break
+    if not already_in:
+        logger.addHandler(hdr)
+
+    hdr = TimedRotatingFileHandler(path, 'D', 1, backupCount)
+    hdr.setFormatter(frt)
+    hdr._name = '##_rfh_##'
+    already_in = False
+    for _hdr in logger.handlers:
+        if _hdr._name == '##_rfh_##':
+            already_in = True
+            break
+    if not already_in:
+        logger.addHandler(hdr)
+
+    for hdr in CFG.handlers:
         hdr.setFormatter(frt)
-        hdr._name = logname + '_p'
         already_in = False
         for _hdr in logger.handlers:
-            if _hdr._name == logname + '_p':
+            if _hdr._name == hdr._name:
                 already_in = True
                 break
         if not already_in:
             logger.addHandler(hdr)
-    if to_stdout:
-        hdr = logging.StreamHandler(sys.stdout)
-        hdr.setFormatter(frt)
-        hdr._name = logname + '_s'
-        already_in = False
-        for _hdr in logger.handlers:
-            if _hdr._name == logname + '_s':
-                already_in = True
-        if not already_in:
-            logger.addHandler(hdr)
-    if level == 'NOTEST':
+
+    if level.upper() == 'NOTEST':
         level == logging.NOTSET
-    elif level == 'DEBUG':
+    elif level.upper() == 'DEBUG':
         level == logging.DEBUG
-    elif level == 'WARNING':
+    elif level.upper() == 'WARNING':
         level == logging.WARNING
-    elif level == 'ERROR':
+    elif level.upper() == 'ERROR':
         level == logging.ERROR
-    elif level == 'CRITICAL':
+    elif level.upper() == 'CRITICAL':
         level == logging.CRITICAL
     else:
         level == logging.INFO
     logger.setLevel(level)
 
-    sentrykey = sentrykey.strip()
-    print 'see sentry: ', sentrykey # hdr = SentryHandler('http://1d1db94883984afb8401b1c616b63922:c7cf1b896ed1465d8f047d36b0fdd268@111.innapp.cn:9090/3')
-    if not sentrykey == '':
-        if not '?' in sentrykey:
-            sentrykey = sentrykey + '?timeout=' + str(TIMEOUT)
-        elif not 'timeout=' in sentrykey.split('?')[-1]:
-            sentrykey = sentrykey + '&timeout=' + str(TIMEOUT)
-    hdr = SentryHandler(sentrykey)
-
     def _wraper(*args, **kwargs):
-        if not LOGDEBUG:
+        if not CFG.debug:
             return
         if not args:
             return
         encoding = 'utf8' if os.name == 'posix' else 'gbk'
         args = [_cu(a, encoding) for a in args]
-        f_back = None
-        try:
-            raise Exception
-        except:
-            f_back = sys.exc_traceback.tb_frame.f_back
-        f_name = f_back.f_code.co_name
-        filename = os.path.basename(f_back.f_code.co_filename)
-        m_name = os.path.splitext(filename)[0]
-        prefix = (u'[%s.%s]' % (m_name, f_name)).ljust(20, ' ')
-        s = kwargs.get('to_sentry', False)
-        if s and not sentrykey == '':
-            logger.addHandler(hdr)
-        else:
-            logger.removeHandler(hdr)
+
+        prefix = ''
+
         l = kwargs.get('printlevel', 'info').upper()
         if l == 'DEBUG':
             try:
@@ -213,8 +196,9 @@ def logprint(logname, category, level='INFO', to_stdout=True, backupCount=15, se
                 print 'Error: %s' % ','.join(err_messages)
     return _wraper, logger
 
+
 def fileprint(filename, category, level=logging.DEBUG, maxBytes=1024*10124*100,
-             backupCount=0, to_stdout=True):
+             backupCount=0):
     """
         Print files by file size.
 
@@ -228,41 +212,37 @@ def fileprint(filename, category, level=logging.DEBUG, maxBytes=1024*10124*100,
           int, max limit of file size
         backupCount
           int, allowed numbers of file copys
-        to_stdout
-          bool, restrict whether logs to be print in the console or not
         
     """
-    path = os.path.join(FILEDIR, category, filename)
+    path = os.path.join(CFG.filedir, category, filename)
 
     # Initialize filer
     filer = logging.getLogger(filename)
     frt = logging.Formatter('%(message)s')
-    hdr = None
-    if path:
-        hdr = RotatingFileHandler(path, 'a', maxBytes, backupCount, 'utf-8')
-        hdr.setFormatter(frt)
-        hdr._name = filename + '_p'
-        already_in = False
-        for _hdr in filer.handlers:
-            if _hdr._name == filename + '_p':
-                already_in = True
-                break
-        if not already_in:
-            filer.addHandler(hdr)
-    if to_stdout:
-        hdr = logging.StreamHandler(sys.stdout)
-        hdr.setFormatter(frt)
-        hdr._name = filename + '_s'
-        already_in = False
-        for _hdr in filer.handlers:
-            if _hdr._name == filename + '_s':
-                already_in = True
-        if not already_in:
-            filer.addHandler(hdr)
+
+    hdr = RotatingFileHandler(path, 'a', maxBytes, backupCount, 'utf-8')
+    hdr.setFormatter(frt)
+    hdr._name = '##_rfh_##'
+    already_in = False
+    for _hdr in filer.handlers:
+        if _hdr._name == '##_rfh_##':
+            already_in = True
+            break
+    if not already_in:
+        filer.addHandler(hdr)
+
+    hdr = logging.StreamHandler(sys.stdout)
+    hdr.setFormatter(frt)
+    hdr._name = '##_sh_##'
+    already_in = False
+    for _hdr in filer.handlers:
+        if _hdr._name == '##_sh_##':
+            already_in = True
+    if not already_in:
+        filer.addHandler(hdr)
+
     filer.setLevel(level)
     def _wraper(*args):
-        if not LOGDEBUG:
-            return
         if not args:
             return
         encoding = 'utf8' if os.name == 'posix' else 'gbk'

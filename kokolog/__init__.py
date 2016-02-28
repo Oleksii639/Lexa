@@ -2,9 +2,17 @@
 # coding=utf8
 
 """
-    命名空间的内容初始化
+    
 """
 
 __import__('pkg_resources').declare_namespace(__name__)
 __version__ = '0.0.1'
 __author__ = 'hk'
+
+from logging import Handler
+
+class MyLocal(object):
+
+    def __init__(self, **kwargs):
+        # self.__dict__ = dict(self.__dict__, **kwargs)
+        self.__dict__.update(**kwargs)
