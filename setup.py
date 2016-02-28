@@ -13,7 +13,6 @@ README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 requires = [
-    'raven', # 2.2.1
     ]
 
 kokolog = __import__('kokolog')

@@ -8,12 +8,13 @@ import sys
 import os
 import datetime
 import logging
+import traceback
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 
 from . import MyLocal
 from character import _cs, _cu
 
-CFG = MyLocal(debug=True, dir='~/log/', handlers=[])
+CFG = MyLocal(debug=True, dir=os.path.expanduser('~/log/'), handlers=[])
 
 
 def _print(*args):
@@ -153,43 +154,38 @@ def logprint(logname, category, level='INFO', backupCount=15):
 
         prefix = ''
 
-        l = kwargs.get('printlevel', 'info').upper()
-        if l == 'DEBUG':
+        pl = kwargs.get('printlevel', 'info').upper()
+        if pl == 'DEBUG':
             try:
-                logger.debug(u' '.join([prefix,
-                     ' '.join(args)]))
+                logger.debug('', *args, **kwargs)
             except:
                 t, v, b = sys.exc_info()
                 err_messages = traceback.format_exception(t, v, b)
                 print 'Error: %s' % ','.join(err_messages)
-        elif l == 'WARNING':
+        elif pl == 'WARNING':
             try:
-                logger.warning(u' '.join([prefix,
-                     ' '.join(args)]))
+                logger.warning('', *args, **kwargs)
             except:
                 t, v, b = sys.exc_info()
                 err_messages = traceback.format_exception(t, v, b)
                 print 'Error: %s' % ','.join(err_messages)
-        elif l == 'ERROR':
+        elif pl == 'ERROR':
             try:
-                logger.error(u' '.join([prefix,
-                         ' '.join(args)]))
+                logger.error('', *args, **kwargs)
             except:
                 t, v, b = sys.exc_info()
                 err_messages = traceback.format_exception(t, v, b)
                 print 'Error: %s' % ','.join(err_messages)
-        elif l == 'CRITICAL':
+        elif pl == 'CRITICAL':
             try:
-                logger.critical(u' '.join([prefix,
-                     ' '.join(args)]))
+                logger.critical('', *args, **kwargs)
             except:
                 t, v, b = sys.exc_info()
                 err_messages = traceback.format_exception(t, v, b)
                 print 'Error: %s' % ','.join(err_messages)
         else:
             try:
-                logger.info(u' '.join([prefix,
-                     ' '.join(args)]))
+                logger.info('', *args, **kwargs)
             except:
                 t, v, b = sys.exc_info()
                 err_messages = traceback.format_exception(t, v, b)
