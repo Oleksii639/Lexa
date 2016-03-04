@@ -14,7 +14,7 @@ from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from . import MyLocal
 from character import _cs, _cu
 
-CFG = MyLocal(debug=True, dir=os.path.expanduser('~/log/'), handlers=[])
+CFG = MyLocal(debug=True, dir=os.path.expanduser('~/log/'), handlers=[], exist=[])
 
 
 def _print(*args):
@@ -101,34 +101,17 @@ def logprint(logname, category, level='INFO', backupCount=15):
     hdr = logging.StreamHandler(sys.stdout)
     hdr.setFormatter(frt)
     hdr._name = '##_sh_##'
-    already_in = False
-    for _hdr in logger.handlers:
-        if _hdr._name == '##_sh_##':
-            already_in = True
-            break
-    if not already_in:
+    if not hdr._name in CFG.exist:
         logger.addHandler(hdr)
+        CFG.exist.append(hdr._name)
 
     hdr = TimedRotatingFileHandler(path, 'D', 1, backupCount)
     hdr.setFormatter(frt)
     hdr._name = '##_rfh_##'
-    already_in = False
-    for _hdr in logger.handlers:
-        if _hdr._name == '##_rfh_##':
-            already_in = True
-            break
-    if not already_in:
+    if not hdr._name in CFG.exist:
         logger.addHandler(hdr)
+        CFG.exist.append(hdr._name)
 
-    for hdr in CFG.handlers:
-        hdr.setFormatter(frt)
-        already_in = False
-        for _hdr in logger.handlers:
-            if _hdr._name == hdr._name:
-                already_in = True
-                break
-        if not already_in:
-            logger.addHandler(hdr)
 
     if level.upper() == 'NOTEST':
         level == logging.NOTSET
@@ -149,6 +132,12 @@ def logprint(logname, category, level='INFO', backupCount=15):
             return
         if not args:
             return
+            
+        for hdr in CFG.handlers:
+            if not hdr._name in CFG.exist:
+                logger.addHandler(hdr)
+                CFG.exist.append(hdr._name)
+
         encoding = 'utf8' if os.name == 'posix' else 'gbk'
         args = [_cu(a, encoding) for a in args]
 
